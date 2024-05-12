@@ -5,12 +5,21 @@ import {uploadOnCloudinary} from '../utils/Cloudinary.js'
 import { ApiResponse } from "../utils/ApiResponse.js";
 
 const genrateAccessAndRefreshToken=async(userId)=>{
+  try {
     const user = await User.findById(userId);
     const accessToken = user.genrateAccessToken();
     const refreshToken = user.genrateRefreshToken();
     
     user.refreshToken = refreshToken;
-    user.save({validateBeforeSave:false});
+    await user.save({validateBeforeSave:false});
+
+
+    return { accessToken, refreshToken };
+
+  } catch (error) {
+     throw new ApiError(500,"Something went wrong while genrating access and refresh token");
+  }
+    
 
 }
 
@@ -106,14 +115,64 @@ const loginUser = asyncHandler(async(req,res)=>{
     throw new ApiError(404,"User does not exits");
    }
    
-  const isPasswordValid =  user.isPasswordCorrect(password);
+  const isPasswordValid = await  user.isPasswordCorrect(password);
 
   if(!isPasswordValid){
     throw new ApiError(401,"Invalid user credintials");
   }
+  
+  const {accessToken,refreshToken}=await genrateAccessAndRefreshToken(user._id);
+
+  const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+
+  const options ={
+    httpOnly:true,
+    secured:true
+  }
+  
+  return res
+  .status(200)
+  .cookie("accessToken",accessToken,options)
+  .cookie("refreshToken",refreshToken,options)
+  .json(
+    new ApiResponse(
+      200,
+      {
+        user: loggedInUser,accessToken,refreshToken  
+      },
+      "User loggedIn Successfully",
+    )
+  );
 
 });
 
+const logoutUser =asyncHandler(async(req,res)=>{
+  // req.user
+  await User.findByIdAndUpdate(
+    req.user._id,{
+      $set: {
+        refreshToken : undefined,
+      }
+    },
+    {
+      new:true
+    }
+  )
+
+  const options ={
+    httpOnly:true,
+    secured:true
+  }
+
+  return res.status(200)
+  .clearCookie("accessToken",options)
+  .clearCookie("refreshToken",options)
+  .json(new ApiResponse(200,{},"User Logout Successfully"));
+
+})
+
 export {
-  registerUser
+  registerUser,
+  loginUser,
+  logoutUser
 }
