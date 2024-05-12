@@ -4,6 +4,16 @@ import {User } from "../models/user.model.js"
 import {uploadOnCloudinary} from '../utils/Cloudinary.js'
 import { ApiResponse } from "../utils/ApiResponse.js";
 
+const genrateAccessAndRefreshToken=async(userId)=>{
+    const user = await User.findById(userId);
+    const accessToken = user.genrateAccessToken();
+    const refreshToken = user.genrateRefreshToken();
+    
+    user.refreshToken = refreshToken;
+    user.save({validateBeforeSave:false});
+
+}
+
 
 const registerUser = asyncHandler(async (req,res)=>{
    //get data from frontend
@@ -13,7 +23,7 @@ const registerUser = asyncHandler(async (req,res)=>{
    //console.log(password,email);
    
    if(
-    [ username,email,fullName,password].some((field)=> field.trim() === "")
+    [username,email,fullName,password].some((field)=> field.trim() === "")
    ){
     throw new ApiError(400,"All field is required");
    }
@@ -78,6 +88,31 @@ const registerUser = asyncHandler(async (req,res)=>{
 
 });
 
+
+const loginUser = asyncHandler(async(req,res)=>{
+   //data ---> res
+
+   const {username,email,password} = req.body;
+
+   if(!username || !email){
+    throw new ApiError(400,"username or email is required");
+   }
+
+   const user = await User.findOne({
+    $or: [{username},{email}]
+   });
+
+   if(!user){
+    throw new ApiError(404,"User does not exits");
+   }
+   
+  const isPasswordValid =  user.isPasswordCorrect(password);
+
+  if(!isPasswordValid){
+    throw new ApiError(401,"Invalid user credintials");
+  }
+
+});
 
 export {
   registerUser
