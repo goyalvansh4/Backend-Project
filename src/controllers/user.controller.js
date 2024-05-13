@@ -420,6 +420,19 @@ const getUserChannelProfile = asyncHandler(async(req,res)=>{
     }
   }  
   ])
+
+  if(!channel?.length){
+    throw new ApiError(400,"Channel does not exits");
+  }
+
+  return res.status(200)
+  .json(
+    new ApiResponse(
+      200,
+      channel[0],
+      "User Channel fetched successfully"
+    )
+  )
 });
 
 export {
